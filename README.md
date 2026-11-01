@@ -25,7 +25,7 @@ Po pierwszym otwarciu aplikacja działa bez internetu.
 
 1. Zmień pliki i **podnieś wersję** w `sw.js`:
    ```js
-   const CACHE = 'kosci-v3';   // było kosci-v2
+   const CACHE = 'kosci-v4';   // było kosci-v3
    ```
    Bez tego zainstalowane telefony zostaną przy starej wersji.
 2. W repozytorium: **Add file → Upload files**, przeciągnij zmienione pliki, **Commit changes**. GitHub Pages opublikuje je w 1–2 minuty.
@@ -52,7 +52,8 @@ W folderze aplikacji uruchom `python3 -m http.server 8000` i otwórz http://loca
 
 - Wszystko zapisuje się lokalnie na urządzeniu (localStorage przeglądarki), pod kluczem `kosci.v1`. Nic nie trafia na GitHub ani do internetu.
 - **Wyczyszczenie danych przeglądarki / odinstalowanie aplikacji usuwa wszystkie gry i statystyki.**
-- Dane nie synchronizują się między urządzeniami.
+- Dane nie synchronizują się między urządzeniami. Żeby przenieść je na inny telefon, zapisz kopię w Ustawieniach i wczytaj ją na drugim urządzeniu.
+- Regularnie zapisuj kopię danych do pliku – to jedyne zabezpieczenie przed utratą gier.
 
 ## Zasady zaimplementowane w aplikacji
 
@@ -63,3 +64,6 @@ W folderze aplikacji uruchom `python3 -m http.server 8000` i otwórz http://loca
 - Niedokończoną grę można kontynuować z ekranu głównego. Nowa gra przy niedokończonej pyta o jej porzucenie; porzucona gra jest usuwana.
 - Nazwy graczy są wymagane i nie mogą się powtarzać w jednej grze (wielkość liter bez znaczenia).
 - Statystyki liczone są tylko z zakończonych gier.
+- Historia gier: zakończone gry od najnowszej, filtr „Szukaj gracza” (fragment nazwy, wielkość liter bez znaczenia), podgląd gry tylko do odczytu.
+- Ustawienia (ikona zębatki): miejsce zapisu danych, data ostatniej kopii („brak”, dopóki nie zapiszesz pierwszej), wersja aplikacji, kopia danych.
+- Kopia danych to plik `.json` (np. `kosci-kopia-2026-11-01-1823.json`) z graczami i zakończonymi grami, bez gry w toku. Wczytanie kopii pyta o potwierdzenie i **zastępuje** wszystkie dane, także grę w toku. Data ostatniej kopii zmienia się tylko przy zapisie.

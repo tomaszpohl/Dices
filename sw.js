@@ -1,6 +1,6 @@
 /* Service worker – działanie offline.
    Po każdej zmianie plików aplikacji podnieś numer wersji, żeby telefony pobrały nową wersję. */
-const CACHE = 'kosci-v2';
+const CACHE = 'kosci-v3';
 const ASSETS = [
   './',
   './index.html',

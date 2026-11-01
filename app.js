@@ -13,19 +13,25 @@ const LOW_NAMES = {
   F: 'Full', K: 'Kareta', P: 'Poker', Sz: 'Szansa'
 };
 const MIN_PLAYERS = 2, MAX_PLAYERS = 99, MAX_DIGITS = 3;
+const APP_VERSION = '1.1';
+const BACKUP_APP = 'kosci', BACKUP_FORMAT = 1;
 
 /* Struktura danych w localStorage:
    { players: [{ id, name }],
-     games:   [{ id, date, status: 'active' | 'finished', playerIds: [], scores: { [playerId]: [15 × liczba|null] } }] }
+     games:   [{ id, date, finishedAt?, status: 'active' | 'finished', playerIds: [], scores: { [playerId]: [15 × liczba|null] } }],
+     lastBackup: data ISO ostatniego zapisu kopii do pliku | null }
    Porzucona gra jest usuwana – nie trafia do statystyk. */
 let db = load();
 
 function load() {
   try {
     const d = JSON.parse(localStorage.getItem(STORE_KEY));
-    if (d && Array.isArray(d.players) && Array.isArray(d.games)) return d;
+    if (d && Array.isArray(d.players) && Array.isArray(d.games)) {
+      if (!('lastBackup' in d)) d.lastBackup = null;
+      return d;
+    }
   } catch (e) { /* uszkodzone dane – zaczynamy od zera */ }
-  return { players: [], games: [] };
+  return { players: [], games: [], lastBackup: null };
 }
 function save() {
   try { localStorage.setItem(STORE_KEY, JSON.stringify(db)); }
@@ -75,11 +81,30 @@ function score(vals) {
 }
 const gameFilled = (g) => g.playerIds.reduce((a, pid) => a + score(g.scores[pid]).filled, 0);
 
+/* Daty po polsku */
+const fmtDate = (iso) => new Date(iso).toLocaleDateString('pl-PL', { day: 'numeric', month: 'long', year: 'numeric' });
+const fmtDateTime = (iso) => fmtDate(iso) + ', ' + new Date(iso).toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' });
+
+/* Podświetlenie dopasowanego fragmentu nazwy (q = tekst już znormalizowany, małe litery) */
+function highlight(name, q, cls = '') {
+  if (!q) return esc(name);
+  const at = nkey(name).indexOf(q);
+  if (at < 0) return esc(name);
+  return esc(name.slice(0, at)) + `<b${cls ? ` class="${cls}"` : ''}>` + esc(name.slice(at, at + q.length)) + '</b>' + esc(name.slice(at + q.length));
+}
+
 /* Ikony */
 const ICON = {
   back: '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#141829" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M11 6l-6 6 6 6"/></svg>',
   arrow: (c) => `<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>`,
   stats: '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#141829" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 20V10M12 20V4M19 20v-7"/></svg>',
+  history: '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#141829" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
+  gear: '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#141829" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.8-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 11-4 0v-.1a1.7 1.7 0 00-1.1-1.5 1.7 1.7 0 00-1.8.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.8 1.7 1.7 0 00-1.5-1H3a2 2 0 110-4h.1a1.7 1.7 0 001.5-1.1 1.7 1.7 0 00-.3-1.8l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.8.3H9a1.7 1.7 0 001-1.5V3a2 2 0 114 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.8-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.8V9a1.7 1.7 0 001.5 1H21a2 2 0 110 4h-.1a1.7 1.7 0 00-1.5 1z"/></svg>',
+  search: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#5A6075" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>',
+  clear: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#141829" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>',
+  lockInfo: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#2F35C9" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/></svg>',
+  download: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>',
+  upload: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#141829" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15V4M7 9l5-5 5 5M5 20h14"/></svg>',
   play: '<svg width="28" height="28" viewBox="0 0 24 24" fill="#141829" aria-hidden="true"><path d="M8 5.5v13a1 1 0 001.5.86l10.5-6.5a1 1 0 000-1.72L9.5 4.64A1 1 0 008 5.5z"/></svg>',
   minus: (c) => `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M5 12h14"/></svg>`,
   plus: (c, s = 22) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>`,
@@ -131,6 +156,7 @@ function confirmDialog({ title, text, ok, cancel = 'Anuluj', danger = false }) {
 
 /* =========================================================
    3. Nawigacja (hash): #/  #/nowa  #/gra  #/wyniki/<id>  #/statystyki
+                        #/historia  #/podglad/<id>  #/ustawienia
    ========================================================= */
 function go(path, replace = false) {
   const h = '#/' + path;
@@ -146,6 +172,9 @@ function route() {
     case 'gra': return activeGame() ? renderGame() : go('', true);
     case 'wyniki': return renderResults(arg);
     case 'statystyki': return renderStats();
+    case 'historia': return renderHistory();
+    case 'podglad': return renderPreview(arg);
+    case 'ustawienia': return renderSettings();
     default: return renderHome();
   }
 }
@@ -159,17 +188,23 @@ function renderHome() {
   let cont = '';
   if (g) {
     const names = g.playerIds.map(playerName).join(', ');
-    cont = `<a class="btn btn-big btn-yellow" href="#/gra">
-      <span class="btn-col"><span>Kontynuuj grę</span><span class="btn-sub">${gameFilled(g)} / ${g.playerIds.length * 15} pól · ${esc(names)}</span></span>${ICON.play}</a>`;
+    const filled = gameFilled(g), total = g.playerIds.length * 15;
+    const pct = Math.round((filled / total) * 100);
+    cont = `<a class="continue" href="#/gra" aria-label="Kontynuuj grę: ${filled} z ${total} pól, gracze: ${esc(names)}">
+      <span class="continue-top"><span class="continue-title">Kontynuuj grę</span><span class="continue-count">${filled} / ${total} pól</span></span>
+      <span class="progress" aria-hidden="true"><span style="width:${pct}%"></span></span>
+      <span class="continue-names">${esc(names)}</span></a>`;
   }
   app.innerHTML = `<main class="screen home">
     <div class="home-blob" aria-hidden="true"></div>
+    <a class="gear" href="#/ustawienia" aria-label="Ustawienia">${ICON.gear}</a>
     <div class="home-title"><span class="eyebrow">Zapis wyników</span><h1>Kości</h1></div>
     <div class="home-art">${ICON.dice}</div>
     <nav class="home-actions">
       ${cont}
       <button class="btn btn-big btn-primary" id="btn-new"><span>Nowa gra</span>${ICON.arrow('#FFFFFF')}</button>
       <a class="btn btn-big btn-outline" href="#/statystyki"><span>Statystyki</span>${ICON.stats}</a>
+      <a class="btn btn-big btn-outline" href="#/historia"><span>Historia gier</span>${ICON.history}</a>
     </nav></main>`;
   $('#btn-new').addEventListener('click', async () => {
     const ag = activeGame();
@@ -389,20 +424,18 @@ function startGame() {
 /* =========================================================
    6. Tabela gry
    ========================================================= */
-function renderGame() {
-  const g = activeGame();
-  const wrapOld = $('.table-wrap');
-  const scroll = wrapOld && $('#game-screen') ? { t: wrapOld.scrollTop, l: wrapOld.scrollLeft } : null;
-
+/* Tabela wyników gry. readonly = podgląd zakończonej gry (pola nie są dotykowe). */
+function buildTable(g, readonly = false) {
   const ids = g.playerIds;
   const sc = ids.map((id) => score(g.scores[id]));
-  const total = ids.length * 15;
-  const filled = sc.reduce((a, s) => a + s.filled, 0);
   const minW = 64 + 92 * ids.length;
 
   const valueCell = (pi, f) => {
     const id = ids[pi], v = g.scores[id][f], name = playerName(id), fl = FIELDS[f];
     const where = f < 6 ? 'góra ' + fl : 'dół ' + fl;
+    if (readonly) {
+      return `<div class="tcell ro${v !== null && v < 0 ? ' neg' : ''}">${v === null ? '' : fmt(v)}</div>`;
+    }
     if (f >= 6 && !sc[pi].unlocked) {
       return `<button class="tcell locked" data-p="${pi}" data-f="${f}" aria-disabled="true" aria-label="${esc(name)}, ${where} – zablokowane">${ICON.lock}</button>`;
     }
@@ -421,11 +454,21 @@ function renderGame() {
   for (let f = 6; f < 15; f++) rows += `<div class="trow"><div class="tlab">${FIELDS[f]}</div>${ids.map((_, pi) => valueCell(pi, f)).join('')}</div>`;
   rows += `<div class="trow sum"><div class="tlab">Suma z dołu</div>${sc.map((s) => `<div class="tcell">${fmt(s.down)}</div>`).join('')}</div>`;
   rows += `<div class="trow total"><div class="tlab">Suma całk.</div>${sc.map((s) => `<div class="tcell">${fmt(s.all)}</div>`).join('')}</div>`;
+  return { html: `<div class="table-wrap"><div class="grid" style="min-width:${minW}px">${rows}</div></div>`, sc };
+}
+
+function renderGame() {
+  const g = activeGame();
+  const wrapOld = $('.table-wrap');
+  const scroll = wrapOld && $('#game-screen') ? { t: wrapOld.scrollTop, l: wrapOld.scrollLeft } : null;
+  const total = g.playerIds.length * 15;
+  const { html, sc } = buildTable(g);
+  const filled = sc.reduce((a, s) => a + s.filled, 0);
 
   const anyLocked = sc.some((s) => !s.unlocked);
   app.innerHTML = `<main class="screen" id="game-screen">
     ${topbar('Gra w toku', `<span class="pill" aria-label="Wypełnione pola: ${filled} z ${total}">${filled} / ${total} pól</span>`, 'Wyjdź do ekranu głównego (gra zostanie zapisana)')}
-    <div class="table-wrap"><div class="grid" style="min-width:${minW}px">${rows}</div></div>
+    ${html}
     <footer class="footer">
       ${anyLocked ? '<p class="note">Dół odblokowuje się po trzech wynikach z góry u danego gracza</p>' : ''}
       <button class="btn btn-primary" id="finish" ${filled === total ? '' : 'disabled'}>Zakończ grę</button>
@@ -566,23 +609,27 @@ function renderResults(id) {
   const list = g.playerIds.map((pid) => ({ pid, s: score(g.scores[pid]) })).sort((a, b) => b.s.all - a.s.all);
   list.forEach((r) => { r.place = 1 + list.filter((o) => o.s.all > r.s.all).length; });
   const winners = list.filter((r) => r.place === 1).length;
-  const date = new Date(g.finishedAt || g.date).toLocaleString('pl-PL', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  const hasTie = new Set(list.map((r) => r.place)).size < list.length;
 
   const cards = list.map((r) => {
     const b = r.s.bonus > 0 ? ' (bonus +50)' : r.s.bonus < 0 ? ' (bonus −50)' : '';
-    return `<div class="card rank${r.place === 1 ? ' first' : ''}" role="listitem">
+    return `<div class="rank${r.place === 1 ? ' first' : ''}" role="listitem">
       <span class="place" aria-label="Miejsce ${r.place}">${r.place}</span>
       <div class="rank-mid">
-        ${r.place === 1 ? `<span class="winner">${winners > 1 ? 'Remis – zwycięzca' : 'Zwycięzca'}</span>` : ''}
+        ${r.place === 1 ? `<span class="winner">${winners > 1 ? 'Zwycięzca (remis)' : 'Zwycięzca'}</span>` : ''}
         <span class="rank-name">${esc(playerName(r.pid))}</span>
-        <span class="rank-detail">góra ${fmt(r.s.up)}${b} · dół ${fmt(r.s.down)}</span>
+        <span class="rank-detail">Góra ${fmt(r.s.up)}${b} · Dół ${fmt(r.s.down)}</span>
       </div>
       <span class="rank-total" aria-label="Suma ${r.s.all} punktów">${fmt(r.s.all)}</span></div>`;
   }).join('');
 
   app.innerHTML = `<main class="screen">
-    ${topbar('Wyniki gry')}
-    <div class="scroll"><p class="date">Gra zakończona ${esc(date)}</p><div role="list" style="display:flex;flex-direction:column;gap:10px">${cards}</div></div>
+    <header class="results-head"><h1>Wyniki gry</h1><span>Zakończona ${esc(fmtDate(g.finishedAt || g.date))}</span></header>
+    <div class="scroll" style="padding-top:8px">
+      <h2 class="field-label" style="margin:0">Ranking</h2>
+      <div role="list" class="rank-list">${cards}</div>
+      ${hasTie ? '<p class="date">Remis: gracze z tym samym wynikiem dzielą miejsce.</p>' : ''}
+    </div>
     <footer class="footer"><a class="btn btn-primary" href="#/">Ekran główny</a></footer></main>`;
 }
 
@@ -604,6 +651,7 @@ function renderStats() {
     <div class="scroll" style="gap:16px">
       <div><label for="gracz" class="field-label">Gracz</label>
         <div class="select-wrap"><select id="gracz">${players.map((p) => `<option value="${p.id}"${p.id === statsPid ? ' selected' : ''}>${esc(p.name)}</option>`).join('')}</select>${ICON.chevron('#141829', 22)}</div>
+        <p class="hint">Liczone tylko z zakończonych gier</p>
       </div>
       <div id="stats-body"></div>
     </div></main>`;
@@ -645,7 +693,175 @@ function renderStatsBody() {
 }
 
 /* =========================================================
-   10. Start
+   10. Historia gier (tylko zakończone, od najnowszej)
+   ========================================================= */
+let histQuery = '';
+
+function renderHistory() {
+  app.innerHTML = `<main class="screen">
+    ${topbar('Historia gier')}
+    <div class="search-box">
+      <label for="szukaj" class="field-label">Szukaj gracza</label>
+      <div class="search">
+        ${ICON.search}
+        <input id="szukaj" type="text" value="${esc(histQuery)}" placeholder="Wpisz nazwę gracza" autocomplete="off" spellcheck="false" enterkeyhint="search">
+        <button class="search-clear" id="szukaj-x" aria-label="Wyczyść filtr"${histQuery ? '' : ' hidden'}>${ICON.clear}</button>
+      </div>
+      <p class="hint" id="hist-count" aria-live="polite"></p>
+    </div>
+    <div class="scroll hist-list" id="hist-list"></div></main>`;
+  const inp = $('#szukaj');
+  inp.addEventListener('input', () => { histQuery = inp.value; renderHistoryList(); });
+  inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') inp.blur(); });
+  $('#szukaj-x').addEventListener('click', () => { histQuery = ''; inp.value = ''; renderHistoryList(); inp.focus(); });
+  renderHistoryList();
+}
+
+function renderHistoryList() {
+  const q = nkey(histQuery);
+  const all = finishedGames().slice().sort((a, b) => (b.finishedAt || b.date).localeCompare(a.finishedAt || a.date));
+  const games = q ? all.filter((g) => g.playerIds.some((pid) => nkey(playerName(pid)).includes(q))) : all;
+  $('#szukaj-x').hidden = !histQuery;
+  const count = $('#hist-count');
+  const list = $('#hist-list');
+
+  if (!all.length) {
+    count.textContent = '';
+    list.innerHTML = '<p class="empty-state">Nie ma jeszcze zakończonych gier.<br>Zakończone gry pojawią się tutaj.</p>';
+    return;
+  }
+  count.textContent = q ? `Gry, w których grał gracz pasujący do „${norm(histQuery)}” · ${gierLabel(games.length)}` : `Wszystkie zakończone gry · ${gierLabel(games.length)}`;
+  if (!games.length) {
+    list.innerHTML = `<p class="empty-state">Brak gier z graczem pasującym do „${esc(norm(histQuery))}”.</p>`;
+    return;
+  }
+  list.innerHTML = games.map((g) => {
+    const rows = g.playerIds.map((pid) => ({ pid, all: score(g.scores[pid]).all }))
+      .sort((a, b) => b.all - a.all)
+      .map((r) => `<span class="hist-row"><span>${highlight(playerName(r.pid), q, 'mark')}</span><b class="${r.all < 0 ? 'neg' : ''}">${fmt(r.all)}</b></span>`).join('');
+    return `<a class="hist-card" href="#/podglad/${g.id}">
+      <span class="hist-top"><span class="hist-date">${esc(fmtDate(g.date))}</span><span class="hist-n">${g.playerIds.length} graczy</span></span>
+      <span class="hist-rows">${rows}</span></a>`;
+  }).join('');
+}
+
+/* Podgląd zakończonej gry – tylko do odczytu */
+function renderPreview(id) {
+  const g = db.games.find((x) => x.id === id && x.status === 'finished');
+  if (!g) return go('historia', true);
+  const { html } = buildTable(g, true);
+  app.innerHTML = `<main class="screen">
+    <header class="topbar">
+      <a class="icon-btn" href="#/historia" aria-label="Wróć do historii gier">${ICON.back}</a>
+      <div class="title-col"><h1>Gra z ${esc(fmtDate(g.date))}</h1><span>${g.playerIds.length} graczy · zakończona</span></div>
+    </header>
+    <div class="ro-info">${ICON.lockInfo} Tylko podgląd – wyników nie można zmieniać</div>
+    ${html}</main>`;
+}
+
+/* =========================================================
+   11. Ustawienia i kopia danych
+   ========================================================= */
+function renderSettings() {
+  const last = db.lastBackup ? esc(fmtDateTime(db.lastBackup)) : 'brak';
+  app.innerHTML = `<main class="screen">
+    ${topbar('Ustawienia')}
+    <div class="scroll" style="padding-top:8px;gap:14px">
+      <section class="set-card">
+        <h2 class="field-label">Miejsce zapisu danych</h2>
+        <span class="set-val">Pamięć aplikacji</span>
+        <span class="set-desc">Na razie dane są zapisywane tylko w pamięci aplikacji na tym urządzeniu.</span>
+      </section>
+      <section class="set-card">
+        <h2 class="field-label">Ostatnia kopia danych</h2>
+        <span class="set-val" id="last-backup">${last}</span>
+      </section>
+      <section class="set-card">
+        <h2 class="field-label">Wersja aplikacji</h2>
+        <span class="set-val">${APP_VERSION}</span>
+      </section>
+      <section class="set-card" style="gap:12px">
+        <h2 class="field-label">Kopia danych</h2>
+        <button class="btn btn-primary set-btn" id="backup-save">${ICON.download} Zapisz kopię danych do pliku</button>
+        <button class="btn btn-outline set-btn" id="backup-load">${ICON.upload} Wczytaj kopię danych z pliku</button>
+        <input type="file" id="backup-file" accept=".json,application/json" hidden>
+      </section>
+    </div></main>`;
+  $('#backup-save').addEventListener('click', saveBackup);
+  $('#backup-load').addEventListener('click', () => $('#backup-file').click());
+  $('#backup-file').addEventListener('change', (e) => {
+    const file = e.target.files && e.target.files[0];
+    e.target.value = '';
+    if (file) loadBackup(file);
+  });
+}
+
+/* Zapis kopii: gracze + zakończone gry (bez gry w toku), pobranie pliku .json */
+function saveBackup() {
+  const now = new Date();
+  const games = finishedGames();
+  const data = { app: BACKUP_APP, format: BACKUP_FORMAT, version: APP_VERSION, createdAt: now.toISOString(), players: db.players, games };
+  const blob = new Blob([JSON.stringify(data, null, 1)], { type: 'application/json' });
+  const pad = (n) => String(n).padStart(2, '0');
+  const name = `kosci-kopia-${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}.json`;
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+  db.lastBackup = now.toISOString();
+  save();
+  const lb = $('#last-backup');
+  if (lb) lb.textContent = fmtDateTime(db.lastBackup);
+  toast(`Zapisano kopię: ${gierLabel(games.length)}`);
+}
+
+/* Sprawdzenie, czy plik jest poprawną kopią danych */
+function parseBackup(text) {
+  let d;
+  try { d = JSON.parse(text); } catch (e) { return null; }
+  if (!d || d.app !== BACKUP_APP || !Array.isArray(d.players) || !Array.isArray(d.games)) return null;
+  const ids = new Set();
+  for (const p of d.players) {
+    if (!p || typeof p.id !== 'string' || typeof p.name !== 'string' || !norm(p.name)) return null;
+    ids.add(p.id);
+  }
+  for (const g of d.games) {
+    if (!g || typeof g.id !== 'string' || g.status !== 'finished' || typeof g.date !== 'string') return null;
+    if (!Array.isArray(g.playerIds) || g.playerIds.length < MIN_PLAYERS || !g.scores) return null;
+    for (const pid of g.playerIds) {
+      const s = g.scores[pid];
+      if (!ids.has(pid) || !Array.isArray(s) || s.length !== 15) return null;
+      if (!s.every((v) => typeof v === 'number' && Number.isFinite(v))) return null;
+    }
+  }
+  return d;
+}
+
+async function loadBackup(file) {
+  let text;
+  try { text = await file.text(); } catch (e) { toast('Nie udało się odczytać pliku'); return; }
+  const d = parseBackup(text);
+  if (!d) { toast('Ten plik nie jest kopią danych aplikacji Kości'); return; }
+  const ok = await confirmDialog({
+    title: 'Wczytać kopię danych?',
+    text: `Obecne dane – gracze, zakończone gry i gra w toku – zostaną zastąpione danymi z pliku (${gierLabel(d.games.length)}${d.createdAt ? ', kopia z ' + esc(fmtDateTime(d.createdAt)) : ''}).`,
+    ok: 'Wczytaj', danger: true
+  });
+  if (!ok) return;
+  db = {
+    players: d.players.map((p) => ({ id: p.id, name: norm(p.name) })),
+    games: d.games.map((g) => ({ id: g.id, date: g.date, finishedAt: g.finishedAt || g.date, status: 'finished', playerIds: g.playerIds.slice(), scores: g.scores })),
+    lastBackup: db.lastBackup                 // data ostatniej kopii zmienia się tylko przy zapisie
+  };
+  save();
+  toast(`Wczytano kopię: ${gierLabel(db.games.length)}`);
+}
+
+/* =========================================================
+   12. Start
    ========================================================= */
 route();
 
