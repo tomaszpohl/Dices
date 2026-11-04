@@ -25,7 +25,7 @@ Po pierwszym otwarciu aplikacja działa bez internetu.
 
 1. Zmień pliki i **podnieś wersję** w `sw.js`:
    ```js
-   const CACHE = 'kosci-v4';   // było kosci-v3
+   const CACHE = 'kosci-v5';   // było kosci-v4
    ```
    Bez tego zainstalowane telefony zostaną przy starej wersji.
 2. W repozytorium: **Add file → Upload files**, przeciągnij zmienione pliki, **Commit changes**. GitHub Pages opublikuje je w 1–2 minuty.
@@ -64,6 +64,8 @@ W folderze aplikacji uruchom `python3 -m http.server 8000` i otwórz http://loca
 - Niedokończoną grę można kontynuować z ekranu głównego. Nowa gra przy niedokończonej pyta o jej porzucenie; porzucona gra jest usuwana.
 - Nazwy graczy są wymagane i nie mogą się powtarzać w jednej grze (wielkość liter bez znaczenia).
 - Statystyki liczone są tylko z zakończonych gier.
-- Historia gier: zakończone gry od najnowszej, filtr „Szukaj gracza” (fragment nazwy, wielkość liter bez znaczenia), podgląd gry tylko do odczytu.
+- Nowa gra startuje z 2 graczami; błędne nazwy pokazują czerwony pasek „Popraw nazwę gracza / nazwy graczy, aby rozpocząć grę”.
+- W tabeli gry niewpisane pola, które gracz może już wypełnić, są podświetlone na czerwono.
+- Historia gier: zakończone gry od najnowszej, filtr „Szukaj gracza” (fragment nazwy, wielkość liter bez znaczenia), podgląd gry tylko do odczytu. Gracz z najwyższym wynikiem (przy remisie – wszyscy) jest wyróżniony na żółto w liście i w podglądzie.
 - Ustawienia (ikona zębatki): miejsce zapisu danych, data ostatniej kopii („brak”, dopóki nie zapiszesz pierwszej), wersja aplikacji, kopia danych.
 - Kopia danych to plik `.json` (np. `kosci-kopia-2026-11-01-1823.json`) z graczami i zakończonymi grami, bez gry w toku. Wczytanie kopii pyta o potwierdzenie i **zastępuje** wszystkie dane, także grę w toku. Data ostatniej kopii zmienia się tylko przy zapisie.

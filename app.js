@@ -13,7 +13,7 @@ const LOW_NAMES = {
   F: 'Full', K: 'Kareta', P: 'Poker', Sz: 'Szansa'
 };
 const MIN_PLAYERS = 2, MAX_PLAYERS = 99, MAX_DIGITS = 3;
-const APP_VERSION = '1.1';
+const APP_VERSION = '1.2';
 const BACKUP_APP = 'kosci', BACKUP_FORMAT = 1;
 
 /* Struktura danych w localStorage:
@@ -102,7 +102,8 @@ const ICON = {
   gear: '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#141829" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.8-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 11-4 0v-.1a1.7 1.7 0 00-1.1-1.5 1.7 1.7 0 00-1.8.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.8 1.7 1.7 0 00-1.5-1H3a2 2 0 110-4h.1a1.7 1.7 0 001.5-1.1 1.7 1.7 0 00-.3-1.8l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.8.3H9a1.7 1.7 0 001-1.5V3a2 2 0 114 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.8-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.8V9a1.7 1.7 0 001.5 1H21a2 2 0 110 4h-.1a1.7 1.7 0 00-1.5 1z"/></svg>',
   search: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#5A6075" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>',
   clear: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#141829" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>',
-  lockInfo: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#2F35C9" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/></svg>',
+  alert: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#8C1D18" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v6M12 16.5v.5"/></svg>',
+  lockInfo:'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#2F35C9" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/></svg>',
   download: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>',
   upload: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#141829" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15V4M7 9l5-5 5 5M5 20h14"/></svg>',
   play: '<svg width="28" height="28" viewBox="0 0 24 24" fill="#141829" aria-hidden="true"><path d="M8 5.5v13a1 1 0 001.5.86l10.5-6.5a1 1 0 000-1.72L9.5 4.64A1 1 0 008 5.5z"/></svg>',
@@ -228,7 +229,7 @@ function renderHome() {
 let ng = null;   // stan formularza: { count, names[], errors[], open }
 
 function renderNew() {
-  ng = { count: 4, names: [], errors: [], open: -1 };
+  ng = { count: 2, names: [], errors: [], open: -1 };
   app.innerHTML = `<main class="screen">
     ${topbar('Nowa gra')}
     <section class="card counter" aria-label="Liczba graczy">
@@ -239,10 +240,10 @@ function renderNew() {
         <button class="step step-plus" id="inc" aria-label="Więcej graczy">${ICON.plus('#FFFFFF')}</button>
       </div>
     </section>
+    <div class="err-banner" id="start-err" role="alert" hidden>${ICON.alert}<span></span></div>
     <div class="section-label" id="plabel">Gracze</div>
     <div class="plist" id="plist" role="list" aria-labelledby="plabel"></div>
     <footer class="footer">
-      <p class="err-text" id="start-err" hidden></p>
       <button class="btn btn-primary" id="start" style="min-height:60px">Rozpocznij grę</button>
     </footer></main>`;
   $('#dec').addEventListener('click', () => setCount(ng.count - 1));
@@ -255,7 +256,10 @@ function renderNew() {
     if (!e.target.matches('input')) return;
     const i = +e.target.dataset.i;
     ng.names[i] = e.target.value;
-    if (ng.errors[i]) { ng.errors[i] = ''; markError(i); }
+    if (ng.errors[i]) {
+      ng.errors[i] = ''; markError(i);
+      if (!ng.errors.some(Boolean)) $('#start-err').hidden = true;
+    }
     showMenu(i);
   });
   list.addEventListener('focusin', (e) => { if (e.target.matches('input')) showMenu(+e.target.dataset.i); });
@@ -402,7 +406,7 @@ function startGame() {
   const bad = errors.filter(Boolean).length;
   const se = $('#start-err');
   if (bad) {
-    se.textContent = bad === 1 ? 'Popraw 1 pole z nazwą gracza' : `Popraw pola z nazwami graczy (${bad})`;
+    se.querySelector('span').textContent = bad === 1 ? 'Popraw nazwę gracza, aby rozpocząć grę' : 'Popraw nazwy graczy, aby rozpocząć grę';
     se.hidden = false;
     const first = errors.findIndex(Boolean);
     $(`[data-row="${first}"]`).scrollIntoView({ block: 'center', behavior: 'smooth' });
@@ -445,7 +449,10 @@ function buildTable(g, readonly = false) {
     return `<button class="tcell${v < 0 ? ' neg' : ''}" data-p="${pi}" data-f="${f}" aria-label="${esc(name)}, ${where}: ${v}">${fmt(v)}</button>`;
   };
 
-  let rows = `<div class="trow thead"><div class="tlab" aria-hidden="true"></div>${ids.map((id) => `<div class="tname"><span>${esc(playerName(id))}</span></div>`).join('')}</div>`;
+  // W podglądzie zakończonej gry wyróżniamy gracza(y) z najwyższym wynikiem
+  const best = readonly ? Math.max(...sc.map((s) => s.all)) : null;
+  const isTop = (pi) => readonly && sc[pi].all === best;
+  let rows = `<div class="trow thead"><div class="tlab" aria-hidden="true"></div>${ids.map((id, pi) => `<div class="tname${isTop(pi) ? ' top' : ''}"><span>${esc(playerName(id))}</span>${isTop(pi) ? '<span class="sr-only"> – najwyższy wynik</span>' : ''}</div>`).join('')}</div>`;
   for (let f = 0; f < 6; f++) rows += `<div class="trow"><div class="tlab">${FIELDS[f]}</div>${ids.map((_, pi) => valueCell(pi, f)).join('')}</div>`;
   rows += `<div class="trow sum"><div class="tlab">Suma z góry</div>${sc.map((s) => {
     const b = s.complete ? `<span class="bonus">${s.bonus > 0 ? 'bonus +50' : s.bonus < 0 ? 'bonus −50' : 'bez bonusu'}</span>` : '';
@@ -453,7 +460,7 @@ function buildTable(g, readonly = false) {
   }).join('')}</div>`;
   for (let f = 6; f < 15; f++) rows += `<div class="trow"><div class="tlab">${FIELDS[f]}</div>${ids.map((_, pi) => valueCell(pi, f)).join('')}</div>`;
   rows += `<div class="trow sum"><div class="tlab">Suma z dołu</div>${sc.map((s) => `<div class="tcell">${fmt(s.down)}</div>`).join('')}</div>`;
-  rows += `<div class="trow total"><div class="tlab">Suma całk.</div>${sc.map((s) => `<div class="tcell">${fmt(s.all)}</div>`).join('')}</div>`;
+  rows += `<div class="trow total"><div class="tlab">Suma całk.</div>${sc.map((s, pi) => `<div class="tcell${isTop(pi) ? ' top' : ''}">${fmt(s.all)}</div>`).join('')}</div>`;
   return { html: `<div class="table-wrap"><div class="grid" style="min-width:${minW}px">${rows}</div></div>`, sc };
 }
 
@@ -708,6 +715,7 @@ function renderHistory() {
         <button class="search-clear" id="szukaj-x" aria-label="Wyczyść filtr"${histQuery ? '' : ' hidden'}>${ICON.clear}</button>
       </div>
       <p class="hint" id="hist-count" aria-live="polite"></p>
+      <p class="hint" id="hist-legend" hidden>Żółte tło – gracz z najwyższym wynikiem w grze</p>
     </div>
     <div class="scroll hist-list" id="hist-list"></div></main>`;
   const inp = $('#szukaj');
@@ -731,14 +739,18 @@ function renderHistoryList() {
     return;
   }
   count.textContent = q ? `Gry, w których grał gracz pasujący do „${norm(histQuery)}” · ${gierLabel(games.length)}` : `Wszystkie zakończone gry · ${gierLabel(games.length)}`;
+  $('#hist-legend').hidden = !games.length;
   if (!games.length) {
     list.innerHTML = `<p class="empty-state">Brak gier z graczem pasującym do „${esc(norm(histQuery))}”.</p>`;
     return;
   }
   list.innerHTML = games.map((g) => {
-    const rows = g.playerIds.map((pid) => ({ pid, all: score(g.scores[pid]).all }))
-      .sort((a, b) => b.all - a.all)
-      .map((r) => `<span class="hist-row"><span>${highlight(playerName(r.pid), q, 'mark')}</span><b class="${r.all < 0 ? 'neg' : ''}">${fmt(r.all)}</b></span>`).join('');
+    const res = g.playerIds.map((pid) => ({ pid, all: score(g.scores[pid]).all })).sort((a, b) => b.all - a.all);
+    const best = res[0].all;   // przy remisie na 1. miejscu wyróżniamy wszystkich
+    const rows = res.map((r) => {
+      const top = r.all === best;
+      return `<span class="hist-row${top ? ' top' : ''}"><span>${highlight(playerName(r.pid), q, 'mark')}${top ? ' · najwyższy wynik' : ''}</span><b class="${r.all < 0 ? 'neg' : ''}">${fmt(r.all)}</b></span>`;
+    }).join('');
     return `<a class="hist-card" href="#/podglad/${g.id}">
       <span class="hist-top"><span class="hist-date">${esc(fmtDate(g.date))}</span><span class="hist-n">${g.playerIds.length} graczy</span></span>
       <span class="hist-rows">${rows}</span></a>`;

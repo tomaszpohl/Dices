@@ -114,7 +114,7 @@ a { text-decoration: none; color: inherit; }
 .tname { flex: 1 0 92px; width: 92px; display: flex; align-items: center; justify-content: center; padding: 0 6px; font-family: var(--head); font-weight: 700; font-size: 15px; min-width: 0; }
 .tname span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tcell { flex: 1 0 92px; width: 92px; display: flex; align-items: center; justify-content: center; border: 0; border-right: 1px solid var(--line); background: #fff; padding: 0; font-family: var(--head); font-weight: 700; font-size: 18px; color: var(--ink); }
-.tcell.empty { font-weight: 500; font-size: 20px; color: var(--muted-2); }
+.tcell.empty { background: #FDECEA; font-weight: 800; font-size: 22px; color: var(--neg); }
 .tcell.neg { color: var(--neg); }
 .tcell.locked { background: var(--locked); cursor: default; }
 .trow.sum .tlab, .trow.sum .tcell { background: var(--primary-soft); color: var(--primary); }
@@ -202,7 +202,15 @@ a { text-decoration: none; color: inherit; }
 .hist-row > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .hist-row b { font-family: var(--head); font-weight: 700; }
 .hist-row b.neg { color: var(--neg); }
-.mark { background: var(--yellow); border-radius: 4px; padding: 0 1px; }
+.hist-row.top { align-items: center; font-weight: 700; background: var(--yellow); border: 2px solid var(--ink); border-radius: 10px; padding: 5px 8px; margin: 0 -8px; }
+.hist-row.top b { font-weight: 800; }
+.hist-row.top b.neg { color: var(--neg); }
+.mark { background: #DADDFB; border-radius: 4px; padding: 0 1px; }
+.tname.top { background: var(--yellow); color: var(--ink); }
+.trow.total .tcell.top { background: var(--yellow); color: var(--ink); }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.err-banner { flex: none; margin: 16px 20px 0; padding: 12px 14px; border-radius: 16px; background: #FDECEA; color: #8C1D18; display: flex; align-items: center; gap: 10px; font-size: 14px; font-weight: 600; }
+.err-banner svg { flex: none; }
 
 /* ---------- podgląd zakończonej gry ---------- */
 .title-col { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
