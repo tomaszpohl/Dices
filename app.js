@@ -13,7 +13,7 @@ const LOW_NAMES = {
   F: 'Full', K: 'Kareta', P: 'Poker', Sz: 'Szansa'
 };
 const MIN_PLAYERS = 2, MAX_PLAYERS = 99, MAX_DIGITS = 3;
-const APP_VERSION = '1.2';
+const APP_VERSION = '1.3';
 const BACKUP_APP = 'kosci', BACKUP_FORMAT = 1;
 
 /* Struktura danych w localStorage:
@@ -103,6 +103,9 @@ const ICON = {
   search: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#5A6075" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>',
   clear: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#141829" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>',
   alert: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#8C1D18" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v6M12 16.5v.5"/></svg>',
+  trash: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>',
+  check: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"/></svg>',
+  chipX: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#141829" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>',
   lockInfo:'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#2F35C9" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/></svg>',
   download: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>',
   upload: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#141829" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15V4M7 9l5-5 5 5M5 20h14"/></svg>',
@@ -172,7 +175,7 @@ function route() {
     case 'nowa': return renderNew();
     case 'gra': return activeGame() ? renderGame() : go('', true);
     case 'wyniki': return renderResults(arg);
-    case 'statystyki': return renderStats();
+    case 'statystyki': return renderStats(arg);
     case 'historia': return renderHistory();
     case 'podglad': return renderPreview(arg);
     case 'ustawienia': return renderSettings();
@@ -428,11 +431,11 @@ function startGame() {
 /* =========================================================
    6. Tabela gry
    ========================================================= */
-/* Tabela wyników gry. readonly = podgląd zakończonej gry (pola nie są dotykowe). */
-function buildTable(g, readonly = false) {
+/* Wiersze tabeli – wspólne dla gry i podglądu.
+   readonly = podgląd zakończonej gry (pola nie są dotykowe, zwycięzca na żółto). */
+function tableParts(g, readonly = false) {
   const ids = g.playerIds;
   const sc = ids.map((id) => score(g.scores[id]));
-  const minW = 64 + 92 * ids.length;
 
   const valueCell = (pi, f) => {
     const id = ids[pi], v = g.scores[id][f], name = playerName(id), fl = FIELDS[f];
@@ -440,54 +443,109 @@ function buildTable(g, readonly = false) {
     if (readonly) {
       return `<div class="tcell ro${v !== null && v < 0 ? ' neg' : ''}">${v === null ? '' : fmt(v)}</div>`;
     }
-    if (f >= 6 && !sc[pi].unlocked) {
-      return `<button class="tcell locked" data-p="${pi}" data-f="${f}" aria-disabled="true" aria-label="${esc(name)}, ${where} – zablokowane">${ICON.lock}</button>`;
-    }
     if (v === null) {
-      return `<button class="tcell empty" data-p="${pi}" data-f="${f}" aria-label="${esc(name)}, ${where}: wpisz wynik">+</button>`;
+      return `<button class="tcell empty" data-p="${pi}" data-f="${f}" aria-label="${esc(name)}, ${where}: niewpisany, wpisz wynik">+</button>`;
     }
-    return `<button class="tcell${v < 0 ? ' neg' : ''}" data-p="${pi}" data-f="${f}" aria-label="${esc(name)}, ${where}: ${v}">${fmt(v)}</button>`;
+    return `<button class="tcell${v < 0 ? ' neg' : ''}" data-p="${pi}" data-f="${f}" aria-label="${esc(name)}, ${where}: ${v}, zmień lub usuń">${fmt(v)}</button>`;
   };
 
   // W podglądzie zakończonej gry wyróżniamy gracza(y) z najwyższym wynikiem
   const best = readonly ? Math.max(...sc.map((s) => s.all)) : null;
   const isTop = (pi) => readonly && sc[pi].all === best;
-  let rows = `<div class="trow thead"><div class="tlab" aria-hidden="true"></div>${ids.map((id, pi) => `<div class="tname${isTop(pi) ? ' top' : ''}"><span>${esc(playerName(id))}</span>${isTop(pi) ? '<span class="sr-only"> – najwyższy wynik</span>' : ''}</div>`).join('')}</div>`;
-  for (let f = 0; f < 6; f++) rows += `<div class="trow"><div class="tlab">${FIELDS[f]}</div>${ids.map((_, pi) => valueCell(pi, f)).join('')}</div>`;
-  rows += `<div class="trow sum"><div class="tlab">Suma z góry</div>${sc.map((s) => {
-    const b = s.complete ? `<span class="bonus">${s.bonus > 0 ? 'bonus +50' : s.bonus < 0 ? 'bonus −50' : 'bez bonusu'}</span>` : '';
-    return `<div class="tcell">${fmt(s.up)}${b}</div>`;
-  }).join('')}</div>`;
-  for (let f = 6; f < 15; f++) rows += `<div class="trow"><div class="tlab">${FIELDS[f]}</div>${ids.map((_, pi) => valueCell(pi, f)).join('')}</div>`;
-  rows += `<div class="trow sum"><div class="tlab">Suma z dołu</div>${sc.map((s) => `<div class="tcell">${fmt(s.down)}</div>`).join('')}</div>`;
-  rows += `<div class="trow total"><div class="tlab">Suma całk.</div>${sc.map((s, pi) => `<div class="tcell${isTop(pi) ? ' top' : ''}">${fmt(s.all)}</div>`).join('')}</div>`;
-  return { html: `<div class="table-wrap"><div class="grid" style="min-width:${minW}px">${rows}</div></div>`, sc };
+  const row = (f) => `<div class="trow"><div class="tlab">${FIELDS[f]}</div>${ids.map((_, pi) => valueCell(pi, f)).join('')}</div>`;
+
+  return {
+    sc,
+    minW: 64 + 92 * ids.length,
+    head: `<div class="trow thead"><div class="tlab" aria-hidden="true"></div>${ids.map((id, pi) => `<div class="tname${isTop(pi) ? ' top' : ''}"><span>${esc(playerName(id))}</span>${isTop(pi) ? '<span class="sr-only"> – najwyższy wynik</span>' : ''}</div>`).join('')}</div>`,
+    topRows: [0, 1, 2, 3, 4, 5].map(row).join(''),
+    topSum: `<div class="trow sum"><div class="tlab">Suma z góry</div>${sc.map((s) => {
+      const b = s.complete ? `<span class="bonus">${s.bonus > 0 ? 'bonus +50' : s.bonus < 0 ? 'bonus −50' : 'bez bonusu'}</span>` : '';
+      return `<div class="tcell">${fmt(s.up)}${b}</div>`;
+    }).join('')}</div>`,
+    lowRows: [6, 7, 8, 9, 10, 11, 12, 13, 14].map(row).join(''),
+    lowSum: `<div class="trow sum"><div class="tlab">Suma z dołu</div>${sc.map((s) => `<div class="tcell">${fmt(s.down)}</div>`).join('')}</div>`,
+    total: `<div class="trow total"><div class="tlab">Suma całk.</div>${sc.map((s, pi) => `<div class="tcell${isTop(pi) ? ' top' : ''}">${fmt(s.all)}</div>`).join('')}</div>`
+  };
 }
+
+/* Pełna tabela tylko do podglądu (historia) */
+function buildTable(g) {
+  const t = tableParts(g, true);
+  return { html: `<div class="table-wrap"><div class="grid" style="min-width:${t.minW}px">${t.head}${t.topRows}${t.topSum}${t.lowRows}${t.lowSum}${t.total}</div></div>`, sc: t.sc };
+}
+
+/* Stan sekcji tabeli gry, zapisywany w grze:
+   topOpen – góra rozwinięta; bottomUnlocked – dół odblokowany (zostaje odblokowany na stałe);
+   bottomOpen – dół rozwinięty. */
+function gameUi(g) {
+  if (!g.ui) {
+    // gra zaczęta w starszej wersji (lub nowa): stan sekcji wynika z wpisanych wyników
+    const unlocked = g.playerIds.every((pid) => topCount(g, pid) >= 3);
+    g.ui = { topOpen: !allTopFilled(g), bottomUnlocked: unlocked, bottomOpen: unlocked };
+  }
+  return g.ui;
+}
+const topCount = (g, pid) => g.scores[pid].slice(0, 6).filter((v) => v !== null).length;
+const allTopFilled = (g) => g.playerIds.every((pid) => topCount(g, pid) === 6);
+
+/* Automatyczne zmiany sekcji po zapisaniu / usunięciu wyniku */
+function updateSections(g, wasTopFull) {
+  const ui = gameUi(g);
+  // Dół: odblokowuje się i rozwija sam, gdy każdy gracz ma ≥ 3 wyniki z góry; potem zostaje odblokowany
+  if (!ui.bottomUnlocked && g.playerIds.every((pid) => topCount(g, pid) >= 3)) {
+    ui.bottomUnlocked = true;
+    ui.bottomOpen = true;
+  }
+  // Góra: zwija się sama w chwili wypełnienia ostatniego pola góry (po usunięciu wyniku zostaje, jak jest)
+  if (!wasTopFull && allTopFilled(g)) ui.topOpen = false;
+}
+
+const CHEV_DOWN = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#141829" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>';
+const CHEV_RIGHT = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#141829" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>';
+const LOCK_BAR = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#3A4056" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/></svg>';
 
 function renderGame() {
   const g = activeGame();
+  const ui = gameUi(g);
   const wrapOld = $('.table-wrap');
   const scroll = wrapOld && $('#game-screen') ? { t: wrapOld.scrollTop, l: wrapOld.scrollLeft } : null;
   const total = g.playerIds.length * 15;
-  const { html, sc } = buildTable(g);
-  const filled = sc.reduce((a, s) => a + s.filled, 0);
+  const t = tableParts(g);
+  const filled = t.sc.reduce((a, s) => a + s.filled, 0);
 
-  const anyLocked = sc.some((s) => !s.unlocked);
+  const topHint = !ui.topOpen && allTopFilled(g) ? '<span class="sec-hint">Wszystko wpisane</span>' : '';
+  const topBar = `<div class="sec"><button class="sec-bar" id="sec-top" aria-expanded="${ui.topOpen}">
+      <span class="sec-inner">${ui.topOpen ? CHEV_DOWN : CHEV_RIGHT}<span class="sec-title">Góra</span>${topHint}</span></button></div>`;
+  let lowBar;
+  if (ui.bottomUnlocked) {
+    lowBar = `<div class="sec"><button class="sec-bar" id="sec-low" aria-expanded="${ui.bottomOpen}">
+      <span class="sec-inner">${ui.bottomOpen ? CHEV_DOWN : CHEV_RIGHT}<span class="sec-title">Dół</span></span></button></div>`;
+  } else {
+    const missing = g.playerIds.filter((pid) => topCount(g, pid) < 3).map(playerName).join(', ');
+    lowBar = `<div class="sec"><div class="sec-bar locked"><span class="sec-inner">${LOCK_BAR}
+      <span class="sec-col"><span class="sec-title">Dół</span><span class="sec-note">Rozwinie się, gdy każdy gracz ma 3 wyniki z góry (brakuje: ${esc(missing)})</span></span></span></div></div>`;
+  }
+
+  const rows = t.head + topBar + (ui.topOpen ? t.topRows : '') + t.topSum +
+    lowBar + (ui.bottomUnlocked && ui.bottomOpen ? t.lowRows : '') + t.lowSum + t.total;
+
   app.innerHTML = `<main class="screen" id="game-screen">
     ${topbar('Gra w toku', `<span class="pill" aria-label="Wypełnione pola: ${filled} z ${total}">${filled} / ${total} pól</span>`, 'Wyjdź do ekranu głównego (gra zostanie zapisana)')}
-    ${html}
+    <div class="table-wrap"><div class="grid" style="min-width:${t.minW}px">${rows}</div></div>
     <footer class="footer">
-      ${anyLocked ? '<p class="note">Dół odblokowuje się po trzech wynikach z góry u danego gracza</p>' : ''}
+      <p class="note">Dotknij pola, aby wpisać, zmienić lub usunąć wynik</p>
       <button class="btn btn-primary" id="finish" ${filled === total ? '' : 'disabled'}>Zakończ grę</button>
     </footer></main>`;
 
   const wrap = $('.table-wrap');
+  setSectionWidth();
   if (scroll) { wrap.scrollTop = scroll.t; wrap.scrollLeft = scroll.l; }
   wrap.addEventListener('click', (e) => {
+    if (e.target.closest('#sec-top')) { ui.topOpen = !ui.topOpen; save(); renderGame(); $('#sec-top').focus(); return; }
+    if (e.target.closest('#sec-low')) { ui.bottomOpen = !ui.bottomOpen; save(); renderGame(); $('#sec-low').focus(); return; }
     const c = e.target.closest('.tcell[data-f]');
-    if (!c) return;
-    if (c.classList.contains('locked')) { toast('Dół odblokuje się po trzech wynikach z góry'); return; }
-    openSheet(+c.dataset.p, +c.dataset.f);
+    if (c) openSheet(+c.dataset.p, +c.dataset.f);
   });
   $('#finish').addEventListener('click', async () => {
     if (gameFilled(g) !== total) return;
@@ -499,13 +557,21 @@ function renderGame() {
     if (!ok) return;
     g.status = 'finished';
     g.finishedAt = new Date().toISOString();
+    delete g.ui;
     save();
     go('wyniki/' + g.id, true);
   });
 }
 
+/* Paski sekcji mają szerokość widocznej części tabeli (przy przewijaniu w bok zostają na miejscu) */
+function setSectionWidth() {
+  const wrap = $('#game-screen .table-wrap');
+  if (wrap) wrap.style.setProperty('--vw', wrap.clientWidth + 'px');
+}
+window.addEventListener('resize', setSectionWidth);
+
 /* =========================================================
-   7. Wpis wyniku (dolny panel)
+   7. Wpis, zmiana i usunięcie wyniku (dolny panel)
    ========================================================= */
 let sheet = null;   // { el, pi, f, str, fresh, onKey }
 
@@ -522,16 +588,19 @@ function openSheet(pi, f) {
   el.innerHTML = `<div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sh-t">
     <div class="grip" aria-hidden="true"></div>
     <div class="sheet-head">
-      <div><div class="who">${esc(playerName(pid))} · ${isTop ? 'góra' : 'dół'}</div><h2 id="sh-t" tabindex="-1">${title}</h2></div>
+      <div><div class="who">${esc(playerName(pid))} · ${isTop ? 'góra' : 'dół'}${cur !== null ? ' · edycja wyniku' : ''}</div><h2 id="sh-t" tabindex="-1">${title}</h2></div>
       <button class="icon-btn sheet-close" data-act="close" aria-label="Zamknij bez zapisywania">${ICON.close}</button>
     </div>
     <div class="display" id="disp" aria-live="polite"></div>
+    ${isTop ? '' : '<p class="sheet-hint">Na dole nie wpisuje się wartości ujemnych</p>'}
     <div class="keypad">
       ${[1, 2, 3, 4, 5, 6, 7, 8, 9].map(digit).join('')}
-      <button class="key key-alt" data-k="-" aria-label="Zmień znak (minus)" ${isTop ? '' : 'disabled title="Na dole wyniki nie mogą być ujemne"'}>−</button>
+      ${isTop ? '<button class="key key-alt" data-k="-" aria-label="Zmień znak (minus)">−</button>'
+              : '<button class="key key-off" data-k="-" aria-label="Minus niedostępny na dole" disabled>−</button>'}
       ${digit(0)}
       <button class="key key-alt" data-k="del" aria-label="Usuń ostatnią cyfrę">${ICON.backspace}</button>
     </div>
+    <button class="btn btn-delete" data-act="remove" ${cur === null ? 'disabled' : ''}>${ICON.trash} Usuń wynik</button>
     <div class="sheet-actions">
       <button class="btn btn-outline btn-zero" data-act="zero">Nie zrobiono<br>(wpisz 0)</button>
       <button class="btn btn-primary" data-act="save" id="sh-save">Zapisz</button>
@@ -549,6 +618,7 @@ function openSheet(pi, f) {
     if (a.dataset.act === 'close') closeSheet();
     if (a.dataset.act === 'zero') commit(0);
     if (a.dataset.act === 'save') commit(Number(sheet.str));
+    if (a.dataset.act === 'remove') commit(null);
   });
   sheet.onKey = (e) => {
     if (e.key === 'Escape') { e.preventDefault(); closeSheet(); }
@@ -589,9 +659,12 @@ function updateDisplay() {
   $('#sh-save').disabled = !validStr(s);
 }
 
+/* v = liczba (zapis) albo null (usunięcie wyniku) */
 function commit(v) {
   const g = activeGame();
-  g.scores[g.playerIds[sheet.pi]][sheet.f] = v === 0 ? 0 : v;   // bez „−0”
+  const wasTopFull = allTopFilled(g);
+  g.scores[g.playerIds[sheet.pi]][sheet.f] = v === null ? null : (v === 0 ? 0 : v);   // bez „−0”
+  updateSections(g, wasTopFull);
   save();
   closeSheet();
   renderGame();
@@ -641,20 +714,36 @@ function renderResults(id) {
 }
 
 /* =========================================================
-   9. Statystyki (tylko zakończone gry)
+   9. Statystyki (tylko zakończone gry): zakładki Gracz / Porównanie
    ========================================================= */
 let statsPid = null;
+let compSel = new Set();   // gracze zaznaczeni w porównaniu (do zamknięcia aplikacji)
 
-function renderStats() {
+const zwyciestwLabel = (n) => {
+  if (n === 1) return 'zwycięstwo';
+  const d = n % 10, dd = n % 100;
+  return d >= 2 && d <= 4 && (dd < 12 || dd > 14) ? 'zwycięstwa' : 'zwycięstw';
+};
+
+function statsTabs(active) {
+  return `<nav class="tabs" aria-label="Rodzaj statystyk">
+    <a href="#/statystyki" class="tab${active === 'gracz' ? ' on' : ''}"${active === 'gracz' ? ' aria-current="page"' : ''}>Gracz</a>
+    <a href="#/statystyki/porownanie" class="tab${active === 'por' ? ' on' : ''}"${active === 'por' ? ' aria-current="page"' : ''}>Porównanie</a>
+  </nav>`;
+}
+
+function renderStats(tab) {
   const players = db.players.slice().sort((a, b) => a.name.localeCompare(b.name, 'pl'));
   if (!players.length) {
     app.innerHTML = `<main class="screen">${topbar('Statystyki')}
       <div class="scroll"><p class="empty-state">Nie ma jeszcze żadnych graczy.<br>Rozegraj pierwszą grę, aby zobaczyć statystyki.</p></div></main>`;
     return;
   }
+  if (tab === 'porownanie') return renderCompare(players);
   if (!players.some((p) => p.id === statsPid)) statsPid = players[0].id;
   app.innerHTML = `<main class="screen stats">
     ${topbar('Statystyki')}
+    ${statsTabs('gracz')}
     <div class="scroll" style="gap:16px">
       <div><label for="gracz" class="field-label">Gracz</label>
         <div class="select-wrap"><select id="gracz">${players.map((p) => `<option value="${p.id}"${p.id === statsPid ? ' selected' : ''}>${esc(p.name)}</option>`).join('')}</select>${ICON.chevron('#141829', 22)}</div>
@@ -664,6 +753,78 @@ function renderStats() {
     </div></main>`;
   $('#gracz').addEventListener('change', (e) => { statsPid = e.target.value; renderStatsBody(); });
   renderStatsBody();
+}
+
+/* Porównanie zwycięstw: tylko gry rozegrane dokładnie w wybranym składzie */
+function renderCompare(players) {
+  compSel = new Set([...compSel].filter((id) => playerById(id)));
+  app.innerHTML = `<main class="screen stats">
+    ${topbar('Statystyki')}
+    ${statsTabs('por')}
+    <div class="scroll" style="gap:16px">
+      <div class="comp-pick">
+        <h2 class="field-label">Skład graczy</h2>
+        <div class="chips" id="comp-chips">${players.map((p) => {
+          const on = compSel.has(p.id);
+          return `<button class="chip${on ? ' on' : ''}" data-id="${p.id}" aria-pressed="${on}">${on ? ICON.check : ''}<span>${esc(p.name)}</span></button>`;
+        }).join('')}</div>
+        <p class="hint" style="margin:0">Liczone z zakończonych gier rozegranych dokładnie w tym składzie.</p>
+      </div>
+      <div id="comp-body" aria-live="polite"></div>
+    </div></main>`;
+  $('#comp-chips').addEventListener('click', (e) => {
+    const b = e.target.closest('.chip');
+    if (!b) return;
+    const id = b.dataset.id;
+    if (compSel.has(id)) compSel.delete(id); else compSel.add(id);
+    const on = compSel.has(id);
+    b.classList.toggle('on', on);
+    b.setAttribute('aria-pressed', on);
+    b.innerHTML = (on ? ICON.check : '') + `<span>${esc(playerName(id))}</span>`;
+    renderCompareBody(players);
+  });
+  renderCompareBody(players);
+}
+
+function renderCompareBody(players) {
+  const body = $('#comp-body');
+  const sel = players.filter((p) => compSel.has(p.id)).map((p) => p.id);
+  if (sel.length < 2) {
+    body.innerHTML = '<div class="msg-card">Wybierz co najmniej 2 graczy, aby porównać zwycięstwa.</div>';
+    return;
+  }
+  const games = finishedGames().filter((g) => g.playerIds.length === sel.length && sel.every((id) => g.playerIds.includes(id)));
+  if (!games.length) {
+    body.innerHTML = '<div class="msg-card">Brak zakończonych gier w tym składzie.</div>';
+    return;
+  }
+  const wins = Object.fromEntries(sel.map((id) => [id, 0]));
+  let ties = 0;
+  for (const g of games) {
+    const totals = sel.map((id) => score(g.scores[id]).all);
+    const max = Math.max(...totals);
+    const top = sel.filter((id, i) => totals[i] === max);
+    if (top.length === 1) wins[top[0]] += 1; else ties += 1;   // remis na 1. miejscu nie jest zwycięstwem
+  }
+  const best = Math.max(...sel.map((id) => wins[id]));
+  const total = games.length;
+  const cards = sel.map((id) => {
+    const leader = best > 0 && wins[id] === best;
+    const pct = Math.round((wins[id] / total) * 100);
+    return `<div class="win-card${leader ? ' leader' : ''}">
+      <div class="win-top">
+        <div class="win-name"><span>${esc(playerName(id))}</span>${leader ? '<span class="winner">Najwięcej zwycięstw</span>' : ''}</div>
+        <div class="win-num"><b>${wins[id]}</b><span>${zwyciestwLabel(wins[id])}</span></div>
+      </div>
+      <div class="win-bar" role="img" aria-label="${pct}% gier w tym składzie"><span style="width:${pct}%"></span></div>
+    </div>`;
+  }).join('');
+  body.innerHTML = `<div class="comp-total">
+      <div><span class="ct-label">Gier w tym składzie</span><span class="ct-sub">Remisy: ${ties} (nie liczą się jako zwycięstwo)</span></div>
+      <span class="ct-val">${total}</span>
+    </div>
+    <h2 class="field-label" style="margin:16px 0 10px">Ilość zwycięstw</h2>
+    <div class="win-list">${cards}</div>`;
 }
 
 function renderStatsBody() {
@@ -701,47 +862,129 @@ function renderStatsBody() {
 
 /* =========================================================
    10. Historia gier (tylko zakończone, od najnowszej)
+   Filtr: wybrani gracze („pigułki”); pokazuje gry, w których grali wszyscy wybrani.
    ========================================================= */
-let histQuery = '';
+let histChips = [];   // id graczy w filtrze (zapamiętane do zamknięcia aplikacji)
 
 function renderHistory() {
+  histChips = histChips.filter((id) => playerById(id));
   app.innerHTML = `<main class="screen">
     ${topbar('Historia gier')}
     <div class="search-box">
       <label for="szukaj" class="field-label">Szukaj gracza</label>
-      <div class="search">
-        ${ICON.search}
-        <input id="szukaj" type="text" value="${esc(histQuery)}" placeholder="Wpisz nazwę gracza" autocomplete="off" spellcheck="false" enterkeyhint="search">
-        <button class="search-clear" id="szukaj-x" aria-label="Wyczyść filtr"${histQuery ? '' : ' hidden'}>${ICON.clear}</button>
+      <div class="search-wrap">
+        <div class="search chipbox" id="chipbox">
+          <span id="hist-chips" class="chip-list"></span>
+          <input id="szukaj" type="text" autocomplete="off" spellcheck="false" enterkeyhint="search"
+            role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="hist-sugg">
+        </div>
+        <div class="menu sugg" id="hist-sugg" role="listbox" hidden></div>
       </div>
       <p class="hint" id="hist-count" aria-live="polite"></p>
       <p class="hint" id="hist-legend" hidden>Żółte tło – gracz z najwyższym wynikiem w grze</p>
     </div>
     <div class="scroll hist-list" id="hist-list"></div></main>`;
   const inp = $('#szukaj');
-  inp.addEventListener('input', () => { histQuery = inp.value; renderHistoryList(); });
-  inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') inp.blur(); });
-  $('#szukaj-x').addEventListener('click', () => { histQuery = ''; inp.value = ''; renderHistoryList(); inp.focus(); });
+  inp.addEventListener('input', renderSuggestions);
+  inp.addEventListener('focus', renderSuggestions);
+  inp.addEventListener('blur', () => setTimeout(() => {
+    if (!$('.search-wrap')?.contains(document.activeElement)) hideSuggestions();
+  }, 0));
+  inp.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') { hideSuggestions(); return; }
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const first = $('#hist-sugg .menu-item');
+      if (first && !$('#hist-sugg').hidden) addHistChip(first.dataset.id);
+      return;
+    }
+    if (e.key === 'Backspace' && !inp.value && histChips.length) {
+      histChips.pop(); renderChips(); renderHistoryList();
+    }
+  });
+  $('#chipbox').addEventListener('click', (e) => {
+    const x = e.target.closest('.chip-x');
+    if (x) {
+      histChips = histChips.filter((id) => id !== x.dataset.id);
+      renderChips(); renderHistoryList(); inp.focus();
+      return;
+    }
+    if (e.target === e.currentTarget) inp.focus();
+  });
+  const sugg = $('#hist-sugg');
+  sugg.addEventListener('pointerdown', (e) => e.preventDefault());   // nie zabiera fokusu z pola
+  sugg.addEventListener('click', (e) => {
+    const b = e.target.closest('.menu-item');
+    if (b) addHistChip(b.dataset.id);
+  });
+  renderChips();
   renderHistoryList();
 }
 
+function renderChips() {
+  $('#hist-chips').innerHTML = histChips.map((id) => {
+    const n = esc(playerName(id));
+    return `<span class="fchip">${n}<button class="chip-x" data-id="${id}" aria-label="Usuń gracza ${n} z filtra">${ICON.chipX}</button></span>`;
+  }).join('');
+  $('#szukaj').placeholder = histChips.length ? 'Dodaj kolejnego gracza' : 'Wpisz nazwę gracza';
+  $('#szukaj').setAttribute('aria-label', histChips.length ? 'Dodaj kolejnego gracza do filtra' : 'Szukaj gracza');
+}
+
+function addHistChip(id) {
+  if (!histChips.includes(id)) histChips.push(id);
+  const inp = $('#szukaj');
+  inp.value = '';
+  hideSuggestions();
+  renderChips();
+  renderHistoryList();
+  inp.focus();
+}
+
+function hideSuggestions() {
+  const s = $('#hist-sugg');
+  if (!s) return;
+  s.hidden = true;
+  $('#szukaj').setAttribute('aria-expanded', 'false');
+}
+
+function renderSuggestions() {
+  const inp = $('#szukaj');
+  const q = nkey(inp.value);
+  const s = $('#hist-sugg');
+  if (!q) { hideSuggestions(); return; }
+  const cands = db.players
+    .filter((p) => !histChips.includes(p.id) && nkey(p.name).includes(q))
+    .map((p) => ({ p, games: gamesCount(p.id), starts: nkey(p.name).startsWith(q) }))
+    .sort((a, b) => (b.starts - a.starts) || (b.games - a.games) || a.p.name.localeCompare(b.p.name, 'pl'))
+    .slice(0, 6);
+  if (!cands.length) {
+    s.innerHTML = '<div class="menu-head">Brak pasujących graczy</div>';
+  } else {
+    s.innerHTML = '<div class="menu-head">Dodaj do filtra</div>' + cands.map((c) =>
+      `<button class="menu-item" role="option" data-id="${c.p.id}"><span>${highlight(c.p.name, q)}</span><span class="games">${gierLabel(c.games)}</span></button>`).join('');
+  }
+  s.hidden = false;
+  inp.setAttribute('aria-expanded', 'true');
+}
+
 function renderHistoryList() {
-  const q = nkey(histQuery);
   const all = finishedGames().slice().sort((a, b) => (b.finishedAt || b.date).localeCompare(a.finishedAt || a.date));
-  const games = q ? all.filter((g) => g.playerIds.some((pid) => nkey(playerName(pid)).includes(q))) : all;
-  $('#szukaj-x').hidden = !histQuery;
+  const games = all.filter((g) => histChips.every((id) => g.playerIds.includes(id)));
   const count = $('#hist-count');
   const list = $('#hist-list');
 
   if (!all.length) {
     count.textContent = '';
+    $('#hist-legend').hidden = true;
     list.innerHTML = '<p class="empty-state">Nie ma jeszcze zakończonych gier.<br>Zakończone gry pojawią się tutaj.</p>';
     return;
   }
-  count.textContent = q ? `Gry, w których grał gracz pasujący do „${norm(histQuery)}” · ${gierLabel(games.length)}` : `Wszystkie zakończone gry · ${gierLabel(games.length)}`;
+  count.textContent = histChips.length
+    ? `Gry, w których grali: ${histChips.map(playerName).join(', ')} · ${gierLabel(games.length)}`
+    : `Wszystkie gry · ${gierLabel(games.length)}`;
   $('#hist-legend').hidden = !games.length;
   if (!games.length) {
-    list.innerHTML = `<p class="empty-state">Brak gier z graczem pasującym do „${esc(norm(histQuery))}”.</p>`;
+    list.innerHTML = '<div class="msg-card">Brak gier, w których grali wszyscy wybrani gracze.</div>';
     return;
   }
   list.innerHTML = games.map((g) => {
@@ -749,7 +992,8 @@ function renderHistoryList() {
     const best = res[0].all;   // przy remisie na 1. miejscu wyróżniamy wszystkich
     const rows = res.map((r) => {
       const top = r.all === best;
-      return `<span class="hist-row${top ? ' top' : ''}"><span>${highlight(playerName(r.pid), q, 'mark')}${top ? ' · najwyższy wynik' : ''}</span><b class="${r.all < 0 ? 'neg' : ''}">${fmt(r.all)}</b></span>`;
+      const picked = histChips.includes(r.pid);
+      return `<span class="hist-row${top ? ' top' : ''}"><span class="hist-name"><span class="${picked ? 'mark' : ''}">${esc(playerName(r.pid))}</span>${top ? '<span class="hist-best">najwyższy wynik</span>' : ''}</span><b class="${r.all < 0 ? 'neg' : ''}">${fmt(r.all)}</b></span>`;
     }).join('');
     return `<a class="hist-card" href="#/podglad/${g.id}">
       <span class="hist-top"><span class="hist-date">${esc(fmtDate(g.date))}</span><span class="hist-n">${g.playerIds.length} graczy</span></span>
@@ -761,7 +1005,7 @@ function renderHistoryList() {
 function renderPreview(id) {
   const g = db.games.find((x) => x.id === id && x.status === 'finished');
   if (!g) return go('historia', true);
-  const { html } = buildTable(g, true);
+  const { html } = buildTable(g);
   app.innerHTML = `<main class="screen">
     <header class="topbar">
       <a class="icon-btn" href="#/historia" aria-label="Wróć do historii gier">${ICON.back}</a>
