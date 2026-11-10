@@ -13,7 +13,7 @@ const LOW_NAMES = {
   F: 'Full', K: 'Kareta', P: 'Poker', Sz: 'Szansa'
 };
 const MIN_PLAYERS = 2, MAX_PLAYERS = 99, MAX_DIGITS = 3;
-const APP_VERSION = '1.3';
+const APP_VERSION = '1.3.1';
 const BACKUP_APP = 'kosci', BACKUP_FORMAT = 1;
 
 /* Struktura danych w localStorage:
@@ -987,7 +987,7 @@ function renderHistoryList() {
     list.innerHTML = '<div class="msg-card">Brak gier, w których grali wszyscy wybrani gracze.</div>';
     return;
   }
-  list.innerHTML = games.map((g) => {
+  list.innerHTML = winsCard(games) + games.map((g) => {
     const res = g.playerIds.map((pid) => ({ pid, all: score(g.scores[pid]).all })).sort((a, b) => b.all - a.all);
     const best = res[0].all;   // przy remisie na 1. miejscu wyróżniamy wszystkich
     const rows = res.map((r) => {
@@ -999,6 +999,37 @@ function renderHistoryList() {
       <span class="hist-top"><span class="hist-date">${esc(fmtDate(g.date))}</span><span class="hist-n">${g.playerIds.length} graczy</span></span>
       <span class="hist-rows">${rows}</span></a>`;
   }).join('');
+}
+
+/* Karta „Zwycięstwa w tym składzie” (od 2 graczy w filtrze i co najmniej 1 pasującej gry).
+   Remis na 1. miejscu nie jest zwycięstwem nikogo; wygrana kogoś spoza filtra liczona jako „inni gracze”. */
+function winsCard(games) {
+  if (histChips.length < 2 || !games.length) return '';
+  const wins = Object.fromEntries(histChips.map((id) => [id, 0]));
+  let ties = 0, others = 0;
+  for (const g of games) {
+    const totals = g.playerIds.map((pid) => score(g.scores[pid]).all);
+    const max = Math.max(...totals);
+    const top = g.playerIds.filter((pid, i) => totals[i] === max);
+    if (top.length > 1) ties += 1;
+    else if (top[0] in wins) wins[top[0]] += 1;
+    else others += 1;
+  }
+  const best = Math.max(...histChips.map((id) => wins[id]));
+  const rows = histChips.map((id) => {
+    const lead = best > 0 && wins[id] === best;
+    const pct = Math.round((wins[id] / games.length) * 100);
+    return `<div class="hw-row${lead ? ' lead' : ''}">
+      <div class="hw-top"><span class="hw-name">${esc(playerName(id))}</span><span class="hw-num"><b>${wins[id]}</b><span>${zwyciestwLabel(wins[id])}</span></span></div>
+      <div class="hw-bar" role="img" aria-label="${pct}% gier"><span style="width:${pct}%"></span></div>
+    </div>`;
+  }).join('');
+  const note = 'Remisy: ' + ties + (others > 0 ? ' · Wygrali inni gracze: ' + others : '');
+  return `<section class="hist-wins" aria-label="Zwycięstwa w wybranym składzie">
+    <div class="hw-head"><h2>Zwycięstwa w tym składzie</h2><span>${gierLabel(games.length)}</span></div>
+    ${rows}
+    <span class="hw-note">${note}</span>
+  </section>`;
 }
 
 /* Podgląd zakończonej gry – tylko do odczytu */

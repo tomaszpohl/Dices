@@ -25,7 +25,7 @@ Po pierwszym otwarciu aplikacja działa bez internetu.
 
 1. Zmień pliki i **podnieś wersję** w `sw.js`:
    ```js
-   const CACHE = 'kosci-v7';   // było kosci-v6
+   const CACHE = 'kosci-v8';   // było kosci-v7
    ```
    Bez tego zainstalowane telefony zostaną przy starej wersji.
 2. W repozytorium: **Add file → Upload files**, przeciągnij zmienione pliki, **Commit changes**. GitHub Pages opublikuje je w 1–2 minuty.
@@ -67,6 +67,6 @@ W folderze aplikacji uruchom `python3 -m http.server 8000` i otwórz http://loca
 - Statystyki liczone są tylko z zakończonych gier. Zakładka „Porównanie”: liczba zwycięstw wybranych graczy w grach rozegranych dokładnie w tym składzie (remis na 1. miejscu nie jest zwycięstwem).
 - Nowa gra startuje z 2 graczami; błędne nazwy pokazują czerwony pasek „Popraw nazwę gracza / nazwy graczy, aby rozpocząć grę”.
 - W tabeli gry niewpisane pola, które gracz może już wypełnić, są podświetlone na czerwono.
-- Historia gier: zakończone gry od najnowszej, filtr „Szukaj gracza” – wybrani gracze jako „pigułki”, lista pokazuje gry, w których grali wszyscy wybrani, podgląd gry tylko do odczytu. Gracz z najwyższym wynikiem (przy remisie – wszyscy) jest wyróżniony na żółto w liście i w podglądzie.
+- Historia gier: zakończone gry od najnowszej, filtr „Szukaj gracza” – wybrani gracze jako „pigułki”, lista pokazuje gry, w których grali wszyscy wybrani; przy co najmniej 2 wybranych graczach nad listą jest karta „Zwycięstwa w tym składzie” (zwycięstwa każdego, remisy, wygrane innych graczy), podgląd gry tylko do odczytu. Gracz z najwyższym wynikiem (przy remisie – wszyscy) jest wyróżniony na żółto w liście i w podglądzie.
 - Ustawienia (ikona zębatki): miejsce zapisu danych, data ostatniej kopii („brak”, dopóki nie zapiszesz pierwszej), wersja aplikacji, kopia danych.
 - Kopia danych to plik `.json` (np. `kosci-kopia-2026-11-01-1823.json`) z graczami i zakończonymi grami, bez gry w toku. Wczytanie kopii pyta o potwierdzenie i **zastępuje** wszystkie dane, także grę w toku. Data ostatniej kopii zmienia się tylko przy zapisie.

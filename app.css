@@ -320,3 +320,18 @@ button.sec-bar:active { background: #DADDEB; }
 .hist-name { display: flex; align-items: center; gap: 8px; min-width: 0; overflow: hidden; }
 .hist-name > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border-radius: 4px; padding: 0 3px; margin-left: -3px; }
 .hist-best { flex: none; font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+
+/* ---------- v1.3.1: historia – karta zwycięstw w składzie ---------- */
+.hist-wins { display: flex; flex-direction: column; gap: 10px; background: var(--primary); color: #fff; border-radius: 20px; padding: 16px 18px; }
+.hw-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.hw-head h2 { margin: 0; font-family: var(--head); font-weight: 700; font-size: 17px; }
+.hw-head span, .hw-note { font-size: 13px; color: #DADDFB; }
+.hw-row { display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border-radius: 14px; background: rgba(255, 255, 255, .12); border: 2px solid transparent; }
+.hw-row.lead { background: var(--yellow); color: var(--ink); border-color: var(--ink); }
+.hw-top { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.hw-name { font-family: var(--head); font-weight: 700; font-size: 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hw-num { display: flex; align-items: baseline; gap: 6px; flex: none; font-size: 13px; }
+.hw-num b { font-family: var(--head); font-weight: 800; font-size: 24px; line-height: 1; }
+.hw-bar { height: 8px; border-radius: 4px; background: rgba(20, 24, 41, .18); overflow: hidden; }
+.hw-bar span { display: block; height: 100%; border-radius: 4px; background: #fff; }
+.hw-row.lead .hw-bar span { background: var(--ink); }
